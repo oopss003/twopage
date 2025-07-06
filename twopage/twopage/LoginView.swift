@@ -1,5 +1,6 @@
 import SwiftUI
 import Firebase
+import FirebaseCore
 import FirebaseAuth
 import GoogleSignIn
 import GoogleSignInSwift
@@ -11,22 +12,26 @@ struct LoginView: View {
     @State private var password = ""
     @State private var loginError = ""
     @State private var isLoggedIn = false
-    @State private var vm = AuthenticationView()
-    @Environment(\.colorScheme) var colorScheme // 다크모드 확인
-    
+    @State private var currentNonce: String?
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         NavigationStack {
             VStack {
+                // 이메일 / 패스워드
                 TextField("Email", text: $email)
                     .padding()
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(10)
-                
+                    .keyboardType(.emailAddress)
+                    .autocapitalization(.none)
+
                 SecureField("Password", text: $password)
                     .padding()
                     .background(Color(.secondarySystemBackground))
                     .cornerRadius(10)
-                
+
+                // 이메일 로그인 버튼
                 Button(action: { login() }) {
                     Text("Login")
                         .foregroundColor(.white)
@@ -34,85 +39,148 @@ struct LoginView: View {
                         .background(Color.blue)
                         .cornerRadius(10)
                 }
-                
-                // Google 로그인 버튼
-                GoogleSignInButton(viewModel: GoogleSignInButtonViewModel(scheme: .light)) {
-                    vm.signInWithGoogle()
-                }
-                .frame(height: 50)
-                .cornerRadius(10)
-                .padding(.top, 20)
-                .background(colorScheme == .dark ? Color.black : Color.white) // 다크모드 체크
-                .foregroundColor(colorScheme == .dark ? .white : .black) // 다크모드에서 흰색 글자, 흰색 배경
+                .padding(.vertical)
 
-                // Apple 로그인 버튼 추가
+                // 커스텀 Google 버튼
+                Button(action: { signInWithGoogle() }) {
+                    HStack(spacing: 8) {
+                        // "google_logo" 라는 이름의 이미지가 Assets에 있어야 합니다.
+                        Image("google_logo")
+                            .resizable()
+                            .frame(width: 24, height: 24)
+                        Text("Sign in with Google")
+                            .font(.system(size: 17, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(colorScheme == .dark ? Color.black : Color.white)
+                    .cornerRadius(10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color.gray.opacity(colorScheme == .dark ? 0.3 : 0.2), lineWidth: 1)
+                    )
+                }
+
+                // Apple 로그인 버튼
                 SignInWithAppleButton(.signIn, onRequest: { request in
+                    let nonce = randomNonceString()
+                    currentNonce = nonce
                     request.requestedScopes = [.fullName, .email]
+                    request.nonce = sha256(nonce)
                 }, onCompletion: { result in
                     switch result {
                     case .success(let authResults):
-                        if let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential {
-                            handleAppleIDCredential(credential: appleIDCredential)
+                        guard let nonce = currentNonce,
+                              let appleIDCredential = authResults.credential as? ASAuthorizationAppleIDCredential,
+                              let appleIDToken = appleIDCredential.identityToken,
+                              let idTokenString = String(data: appleIDToken, encoding: .utf8) else {
+                            self.loginError = "Apple 로그인에 필요한 정보를 얻지 못했습니다."
+                            print(loginError)
+                            return
                         }
+
+                        // Apple용 credential (accessToken 파라미터 없이)
+                        let credential = OAuthProvider.credential(
+                            withProviderID: "apple.com",
+                            idToken: idTokenString,
+                            rawNonce: nonce     // Apple 로그인은 accessToken 없음
+                        )
+
+                        Auth.auth().signIn(with: credential) { _, error in
+                            if let error = error {
+                                print("Firebase Apple 로그인 실패: \(error.localizedDescription)")
+                                self.loginError = error.localizedDescription
+                            } else {
+                                print("✅ Firebase Apple 로그인 성공")
+                                proceedToTermsView()
+                            }
+                        }
+
                     case .failure(let error):
                         print("Apple 로그인 실패: \(error.localizedDescription)")
+                        self.loginError = error.localizedDescription
                     }
                 })
                 .frame(height: 50)
                 .cornerRadius(10)
-                .padding(.top, 20)
-                .background(colorScheme == .dark ? Color.black : Color.white) // 다크모드 체크
-                .foregroundColor(colorScheme == .dark ? .white : .black) // 다크모드에서 흰색 글자, 흰색 배경
+                .padding(.top)
+                .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
 
+                // 에러 표시
                 if !loginError.isEmpty {
                     Text(loginError)
                         .foregroundColor(.red)
                         .padding()
                 }
-                
-                NavigationLink(value: isLoggedIn) {
-                    EmptyView()
-                }
-                .navigationDestination(isPresented: $isLoggedIn) {
-                    ContentView()
-                        .navigationBarBackButtonHidden(true)
-                }
             }
             .padding()
+            .navigationDestination(isPresented: $isLoggedIn) {
+                TermsView()
+                    .navigationBarBackButtonHidden(true)
+            }
         }
     }
 
+    // MARK: - 공통 진입로
+    private func proceedToTermsView() {
+        DispatchQueue.main.async {
+            self.isLoggedIn = true
+            print("✅ isLoggedIn set → TermsView 준비")
+        }
+    }
+
+    // MARK: - 로그인 메서드들
     func login() {
         Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
             if let error = error {
                 loginError = error.localizedDescription
-            }
-            isLoggedIn = true
-        }
-    }
-    
-    func handleAppleIDCredential(credential: ASAuthorizationAppleIDCredential) {
-        guard let identityToken = credential.identityToken,
-              let tokenString = String(data: identityToken, encoding: .utf8) else {
-            print("Apple ID Token을 얻을 수 없습니다.")
-            return
-        }
-        
-        let nonce = randomNonceString()
-        let sha256Nonce = sha256(nonce)
-        let firebaseCredential = OAuthProvider.credential(providerID: .apple, idToken: tokenString, rawNonce: sha256Nonce)
-        
-        Auth.auth().signIn(with: firebaseCredential) { (authResult, error) in
-            if let error = error {
-                print("Firebase 로그인 실패: \(error.localizedDescription)")
             } else {
-                print("Firebase Apple 로그인 성공")
+                proceedToTermsView()
             }
         }
     }
 
+    private func signInWithGoogle() {
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            self.loginError = "Firebase 클라이언트 ID가 없습니다."
+            return
+        }
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootVC = windowScene.windows.first?.rootViewController else {
+            self.loginError = "화면의 최상단 뷰를 찾을 수 없습니다."
+            return
+        }
+
+        GIDSignIn.sharedInstance.signIn(withPresenting: rootVC) { result, error in
+            if let error = error {
+                print("Google 로그인 실패: \(error.localizedDescription)")
+                self.loginError = error.localizedDescription
+                return
+            }
+            guard let idToken = result?.user.idToken?.tokenString,
+                  let accessToken = result?.user.accessToken.tokenString else {
+                self.loginError = "Google 토큰 정보를 가져올 수 없습니다."
+                return
+            }
+
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken,
+                                                         accessToken: accessToken)
+            Auth.auth().signIn(with: credential) { _, error in
+                if let error = error {
+                    print("Firebase Google 로그인 실패: \(error.localizedDescription)")
+                    self.loginError = error.localizedDescription
+                } else {
+                    proceedToTermsView()
+                }
+            }
+        }
+    }
+
+    // MARK: - 헬퍼 메서드
     func randomNonceString(length: Int = 32) -> String {
-        let charset: [Character] = Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
+        let charset: [Character] =
+            Array("0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._")
         var result = ""
         var remainingLength = length
         while remainingLength > 0 {
@@ -138,4 +206,5 @@ struct LoginView: View {
 #Preview {
     LoginView()
 }
+
 
