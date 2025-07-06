@@ -1,204 +1,211 @@
 import SwiftUI
-import FirebaseFirestore
 import FirebaseAuth
+import FirebaseFirestore
+import SafariServices
+
+// 1️⃣ SFSafariViewController 래퍼
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+}
 
 struct TermsView: View {
+    // MARK: — State
     @State private var isServiceAgreement = false
     @State private var isPrivacyAgreement = false
     @State private var isLocationAgreement = false
     @State private var isOver14 = false
     @State private var isAllAgree = false
-
     @State private var selectedStyle: String? = nil
     @State private var selectedGender: String? = nil
     @State private var isSubmitting = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    
+    // 웹뷰 시트용
+    @State private var showSafari = false
+    @State private var safariURL: URL?
 
-    var userEmail: String {
+    // MARK: — Data
+    private var userEmail: String {
         Auth.auth().currentUser?.email ?? ""
     }
-
-    let genderOptions = ["남성", "여성"]
-    let styleOptions = [
-        "ISTJ", "ISFJ", "INFJ", "INTJ",
-        "ISTP", "ISFP", "INFP", "INTP",
-        "ESTP", "ESFP", "ENFP", "ENTP",
-        "ESTJ", "ESFJ", "ENFJ", "ENTJ"
+    private let genderOptions = ["남성", "여성"]
+    private let styleOptions = [
+        "ISTJ","ISFJ","INFJ","INTJ",
+        "ISTP","ISFP","INFP","INTP",
+        "ESTP","ESFP","ENFP","ENTP",
+        "ESTJ","ESFJ","ENFJ","ENTJ"
     ]
-
+    
+    // MARK: — Layout
+    private let gridColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("약관 동의")
-                    .font(.title)
-                    .bold()
+                    .font(.title).bold()
                     .frame(maxWidth: .infinity, alignment: .center)
 
+                // 전체 동의
                 Toggle("전체 동의", isOn: $isAllAgree)
-                    .onChange(of: isAllAgree) { oldValue, newValue in
-                        isServiceAgreement = newValue
-                        isPrivacyAgreement = newValue
-                        isLocationAgreement = newValue
-                        isOver14 = newValue
+                    .onChange(of: isAllAgree) { _, new in
+                        isServiceAgreement = new
+                        isPrivacyAgreement = new
+                        isLocationAgreement = new
+                        isOver14 = new
                     }
 
-                // 서비스 이용약관
-                Group {
-                    Button(action: {
-                        if let url = URL(string: "https://yourdomain.com/service") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        HStack {
-                            Text("서비스 이용약관 (필수)")
+                // 개별 약관
+                ForEach([
+                    ("서비스 이용약관 (필수)", $isServiceAgreement, "https://yourdomain.com/service"),
+                    ("개인정보 수집 및 이용 (필수)", $isPrivacyAgreement, "https://inwave.ai.kr/privacy_policy.html"),
+                    ("위치기반 서비스 이용약관 (필수)", $isLocationAgreement, "https://yourdomain.com/location")
+                ], id: \.0) { label, binding, urlString in
+                    HStack {
+                        // 웹뷰 모달로 열기
+                        Button {
+                            guard let url = URL(string: urlString) else { return }
+                            safariURL = url
+                            showSafari = true
+                        } label: {
+                            Text(label)
                                 .foregroundColor(.primary)
-                            Spacer()
-                            Toggle("", isOn: $isServiceAgreement)
-                                .labelsHidden()
                         }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
+                        Spacer()
+                        Toggle("", isOn: binding)
+                            .labelsHidden()
                     }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .onChange(of: isServiceAgreement) { updateAllAgree() }
-
-                // 개인정보 수집 및 이용 동의
-                Group {
-                    Button(action: {
-                        if let url = URL(string: "https://yourdomain.com/privacy") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        HStack {
-                            Text("개인정보 수집 및 이용 동의 (필수)")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Toggle("", isOn: $isPrivacyAgreement)
-                                .labelsHidden()
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
+                    .onChange(of: binding.wrappedValue) { _ in
+                        updateAllAgree()
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
-                .onChange(of: isPrivacyAgreement) { updateAllAgree() }
 
-                // 위치기반 서비스 이용약관
-                Group {
-                    Button(action: {
-                        if let url = URL(string: "https://yourdomain.com/location") {
-                            UIApplication.shared.open(url)
-                        }
-                    }) {
-                        HStack {
-                            Text("위치기반 서비스 이용약관 (필수)")
-                                .foregroundColor(.primary)
-                            Spacer()
-                            Toggle("", isOn: $isLocationAgreement)
-                                .labelsHidden()
-                        }
-                        .padding(.vertical, 4)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-                .onChange(of: isLocationAgreement) { updateAllAgree() }
-
+                // 나이 확인
                 Toggle("만 14세 이상입니다 (필수)", isOn: $isOver14)
-                    .onChange(of: isOver14) { updateAllAgree() }
+                    .onChange(of: isOver14) { _ in
+                        updateAllAgree()
+                    }
 
+                // 성별 선택
                 Text("성별을 선택해주세요:")
-                LazyHStack(spacing: 12) {
-                    Spacer()
+                LazyVGrid(columns: gridColumns, spacing: 12) {
                     ForEach(genderOptions, id: \.self) { gender in
-                        Button(action: {
-                            selectedGender = gender
-                        }) {
+                        Button { selectedGender = gender }
+                        label: {
                             Text(gender)
-                                .frame(width: 166, height: 50)
-                                .background(selectedGender == gender ? Color.blue : Color.gray.opacity(0.4))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(selectedGender == gender
+                                            ? Color.blue
+                                            : Color.gray.opacity(0.4))
                                 .foregroundColor(.white)
-                                .cornerRadius(10)
+                                .cornerRadius(8)
                         }
                     }
-                    Spacer()
                 }
 
+                // 스타일 선택
                 Text("스타일을 선택해주세요:")
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                LazyVGrid(columns: gridColumns, spacing: 12) {
                     ForEach(styleOptions, id: \.self) { style in
-                        Button(action: {
-                            selectedStyle = style
-                        }) {
-                            if UIImage(named: style) != nil {
-                                Image(style)
-                                    .resizable()
-                                    .frame(width: 166, height: 50)
-                            } else {
-                                Text(style)
-                                    .frame(width: 166, height: 50)
+                        Button { selectedStyle = style }
+                        label: {
+                            Group {
+                                if let uiImage = UIImage(named: style) {
+                                    Image(uiImage: uiImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 40)
+                                } else {
+                                    Text(style)
+                                        .frame(maxWidth: .infinity, minHeight: 40)
+                                }
                             }
+                            .background(selectedStyle == style
+                                        ? Color.blue
+                                        : Color.gray.opacity(0.4))
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
                         }
-                        .background(selectedStyle == style ? Color.blue : Color.gray.opacity(0.4))
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
                     }
                 }
 
-                Button(action: submit) {
-                    Text("동의 완료")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+                // 동의 완료 버튼
+                Button("동의 완료") { submit() }
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                    .disabled(isSubmitting)
+
+                // 알림 메시지
+                if showAlert {
+                    Text(alertMessage)
+                        .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 8)
                 }
-                .disabled(isSubmitting)
             }
-            .padding()
-            .alert(isPresented: $showAlert) {
-                Alert(title: Text("알림"), message: Text(alertMessage), dismissButton: .default(Text("확인")))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 16)
+        }
+        // 1️⃣ 시트로 웹뷰 띄우기
+        .sheet(isPresented: $showSafari) {
+            if let url = safariURL {
+                SafariView(url: url)
             }
         }
     }
-
-    func updateAllAgree() {
-        isAllAgree = isServiceAgreement && isPrivacyAgreement && isLocationAgreement && isOver14
+    
+    // MARK: — Helpers
+    private func updateAllAgree() {
+        isAllAgree = isServiceAgreement
+            && isPrivacyAgreement
+            && isLocationAgreement
+            && isOver14
     }
-
-    func submit() {
+    
+    private func submit() {
         guard !userEmail.isEmpty else {
-            alertMessage = "이메일 정보를 찾을 수 없습니다."
+            alertMessage = "이메일 정보가 없습니다."
             showAlert = true
             return
         }
-
-        guard isServiceAgreement && isPrivacyAgreement && isLocationAgreement && isOver14 else {
+        guard isAllAgree else {
             alertMessage = "모든 필수 약관에 동의해주세요."
             showAlert = true
             return
         }
-
-        guard let style = selectedStyle, let gender = selectedGender else {
+        guard let gender = selectedGender,
+              let style = selectedStyle else {
             alertMessage = "성별과 스타일을 선택해주세요."
             showAlert = true
             return
         }
-
+        
         isSubmitting = true
         let db = Firestore.firestore()
-
-        db.collection("users").document(userEmail.lowercased()).setData([
+        db.collection("users")
+          .document(userEmail.lowercased())
+          .setData([
             "agreedToTerms": true,
-            "selectedStyle": style,
             "selectedGender": gender,
+            "selectedStyle": style,
             "serviceAgreement": isServiceAgreement,
             "privacyAgreement": isPrivacyAgreement,
             "locationAgreement": isLocationAgreement,
             "over14": isOver14
-        ]) { error in
+          ]) { error in
             isSubmitting = false
             if let error = error {
                 alertMessage = "저장 실패: \(error.localizedDescription)"
@@ -210,9 +217,9 @@ struct TermsView: View {
     }
 }
 
-struct TermsView_Previews: PreviewProvider {
-    static var previews: some View {
-        TermsView()
-    }
+#Preview {
+    TermsView()
 }
+
+
 
