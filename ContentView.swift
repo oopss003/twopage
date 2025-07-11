@@ -1,10 +1,3 @@
-// 파일명: ContentView.swift
-// 기능:
-// - NaverMap 지도 위에 Firestore에서 불러온 장소 마커를 표시
-// - 사용자 현재 위치를 표시하고, LocationButton을 눌러 지도를 현재 위치로 이동시킴
-// 관련 파일:
-// - Coordinator.swift (지도 및 마커 제어)
-// - FireStoreManager.swift (Firestore에서 위치 데이터 로딩)
 import SwiftUI
 import CoreLocationUI
 import NMapsMap
@@ -52,7 +45,6 @@ struct ContentView: View {
         }
     }
 }
-
 
 #Preview {
     ContentView()
