@@ -2,40 +2,40 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>앱이 현재 위치를 표시하기 위해 위치 접근 권한이 필요합니다.</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>앱이 백그라운드에서도 위치 정보를 사용하여 특정 지역에 도달할 때 알림을 보냅니다.</string>
-    <key>CFBundleName</key>
-    <string>twopage</string>
-    <key>CFBundleIdentifier</key>
-    <string>com.inwave.twopage</string>
-    <key>MinimumOSVersion</key>
-    <string>14.0</string>
-    <key>CFBundleIcons</key>
-    <dict>
-        <key>CFBundlePrimaryIcon</key>
-        <dict>
-            <key>CFBundleIconFiles</key>
-            <array>
-                <string>AppIcon</string>
-            </array>
-            <key>UIPrerenderedIcon</key>
-            <true/>
-        </dict>
-    </dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-    <key>NSCameraUsageDescription</key>
-    <string>앱이 카메라를 사용하기 위해 권한이 필요합니다.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>앱이 사진 라이브러리를 사용하기 위해 권한이 필요합니다.</string>
-    <key>NMFClientId</key>
-    <string>qbprmxiff4</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>앱이 백그라운드에서도 위치 정보를 사용하여 특정 지역에 도달할 때 알림을 보냅니다.</string>
+	<key>CFBundleName</key>
+	<string>twopage</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.inwave.twopage</string>
+	<key>MinimumOSVersion</key>
+	<string>14.0</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundlePrimaryIcon</key>
+		<dict>
+			<key>CFBundleIconFiles</key>
+			<array>
+				<string>AppIcon</string>
+			</array>
+			<key>UIPrerenderedIcon</key>
+			<true/>
+		</dict>
+	</dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>NSCameraUsageDescription</key>
+	<string>앱이 카메라를 사용하기 위해 권한이 필요합니다.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>앱이 사진 라이브러리를 사용하기 위해 권한이 필요합니다.</string>
+	<key>NMFClientId</key>
+	<string>qbprmxiff4</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>앱이 현재 위치를 표시하기 위해 위치 접근 권한이 필요합니다.</string>
 </dict>
 </plist>
 
