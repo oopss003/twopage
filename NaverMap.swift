@@ -1,12 +1,5 @@
 //
 //  NaverMap.swift
-//  twopage
-//
-//  Created by jae on 7/8/25.
-//
-
-//
-//  NaverMap.swift
 //  NaverMap
 //
 //  Created by 황성진 on 12/28/23.
@@ -23,10 +16,17 @@ struct NaverMap: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> NMFMapView {
-        context.coordinator.getNaverMapView()
+        let mapView = context.coordinator.getNaverMapView()
+        
+        // ✅ 사용자 현재 위치를 나침반 모드(방향 삼각형)로 표시
+        mapView.positionMode = .compass
+        mapView.locationOverlay.hidden = false
+
+        return mapView
     }
 
     func updateUIView(_ uiView: NMFMapView, context: Context) {
         // 필요 시 지도 갱신 작업
     }
 }
+
