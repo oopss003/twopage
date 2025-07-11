@@ -1,60 +1,36 @@
-//
-//  FireStoreManager.swift
-//  twopage
-//
-//  Created by jae on 7/8/25.
-//
-
-//
-//  FireStoreManager.swift
-//  NaverMap
-//
-//  Created by 황성진 on 12/28/23.
-//
-
 import Foundation
 import FirebaseFirestore
 
-struct DataModel {
+/// Firestore `stores` 컬렉션에서 사용하는 최소 모델
+struct StoreModel {
     let name: String
-    let text: String
-    let location: GeoPoint
+    let lat : Double
+    let lng : Double
 }
 
 class FireStoreManager: ObservableObject {
-//    @Published var mylat: Double = 0
-//    @Published var mylng: Double = 0
-//
-    @Published var myLocation: [GeoPoint] = []
-    @Published var myDataModels: [DataModel] = []
+    @Published var stores: [StoreModel] = []
     
-    
-    func fetchData() async {
+    /// `stores` 컬렉션 전체 로드
+    @MainActor
+    func fetchStores() async {
         let db = Firestore.firestore()
-        let docRef = db.collection("freeboard").document("EBvvECgiQidPmdWf0Byq").collection("location1")
-        
         do {
-            let document = try await docRef.getDocuments()
-            for item in document.documents {
-                if let data = item.data() as? [String: Any] {
-                    var dataModel = DataModel.init(name: data["name"] as! String, text: data["text"] as! String, location: data["location"] as! GeoPoint)
-                    myDataModels.append(dataModel)
-                }
+            let snap = try await db.collection("stores").getDocuments()
+            var temp: [StoreModel] = []
+            for doc in snap.documents {
+                let d = doc.data()
+                guard
+                    let name = d["name"] as? String,
+                    let lat  = d["lat"]  as? Double,
+                    let lng  = d["lng"]  as? Double
+                else { continue }                       // 필수 필드 없으면 건너뜀
+                temp.append(StoreModel(name: name, lat: lat, lng: lng))
             }
-            print(myDataModels)
-            
-//            if document.exists {
-//                if let data = document.data() {
-////                    self.mylat = data["lat"] as? Double ?? 0
-////                    self.mylng = data["lng"] as? Double ?? 0
-//                    self.myLocation = data["location"] as! [GeoPoint]
-////                    print(self.mylat)
-////                    print(self.mylng)
-////                    print(myLocation)
-//                }
-//            }
+            stores = temp
+            print("✅ Firestore: \(stores.count)개 매장 로드 완료")
         } catch {
-            print("Error fetching document: \(error)")
+            print("❌ Firestore fetch 실패:", error)
         }
     }
 }
