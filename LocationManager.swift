@@ -1,7 +1,7 @@
 //
 //  LocationManager.swift
 //  twopage
-//
+//  최종전
 //  Created by jae on 7/8/25.
 // 파일명: LocationManager.swift
 // 기능: 이 파일은 `CLLocationManager`를 사용하여 위치 서비스를 관리합니다.
