@@ -5,24 +5,21 @@
 // 관련 파일:
 // - Coordinator.swift (지도 및 마커 제어)
 // - FireStoreManager.swift (Firestore에서 위치 데이터 로딩)
-
 import SwiftUI
 import CoreLocationUI
 import NMapsMap
 
 struct ContentView: View {
-    @StateObject var coordinator = Coordinator.shared
+    @StateObject var coordinator      = Coordinator.shared
     @StateObject var firestoreManager = FireStoreManager()
     
     var body: some View {
         ZStack {
             NaverMap()
-                .ignoresSafeArea(.all, edges: .top)
-                .onAppear {
-                    coordinator.checkIfLocationServiceIsEnabled()
-                }
+                .ignoresSafeArea()
+                .onAppear { coordinator.checkIfLocationServiceIsEnabled() }
             
-            // 지도 위 좌측 상단에 현재 위치 버튼
+            // ── 현재 위치 버튼 ──
             VStack {
                 HStack {
                     LocationButton(.currentLocation) {
@@ -43,19 +40,18 @@ struct ContentView: View {
         }
         .onAppear {
             Task {
-                await firestoreManager.fetchData()
-                for item in firestoreManager.myDataModels {
+                await firestoreManager.fetchStores()          // 🔹 매장 로드
+                for store in firestoreManager.stores {        // 🔹 마커 생성
                     coordinator.setMarker(
-                        lat: item.location.latitude,
-                        lng: item.location.longitude,
-                        name: item.name
+                        lat:  store.lat,
+                        lng:  store.lng,
+                        name: store.name
                     )
                 }
             }
         }
     }
 }
-
 
 
 #Preview {
