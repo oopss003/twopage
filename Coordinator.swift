@@ -6,9 +6,13 @@
 // - 위치 오버레이(파란 원 + 빔) 적용
 // - 헤딩 값으로 지도까지 회전 (카메라 bearing 직접 갱신)
 
+// Coordinator.swift
+// 기존 기능 그대로 유지 + 마커 아이콘을 “macker” 배경 위에 매장명(6자 초과 … 처리)으로 교체
+
 import Foundation
 import CoreLocation
 import NMapsMap
+import UIKit                         // ← UIImage 사용을 위해 추가
 
 class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
     static let shared = Coordinator()
@@ -17,17 +21,18 @@ class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
     private(set) var mapView = NMFMapView()
     @Published var userLocation: CLLocationCoordinate2D?
     
+    // ───────── 초기화 ─────────
     override init() {
         super.init()
         
-        // 위치 매니저 설정
+        // 위치 매니저
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.headingFilter  = kCLHeadingFilterNone
         locationManager.startUpdatingLocation()
         locationManager.startUpdatingHeading()
         
-        // 위치 오버레이 설정
+        // 내 위치 “핀”
         let overlay = mapView.locationOverlay
         overlay.icon        = NMFOverlayImage(name: "loc_blue_dot")
         overlay.iconWidth   = 120
@@ -38,14 +43,16 @@ class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
         overlay.subIconWidth  = 30
         overlay.subIconHeight = 30
         overlay.subAnchor     = CGPoint(x: 0.5, y: 0.65)
+        overlay.circleRadius  = 0
         
-        overlay.circleRadius = 0
-        
-        // 위치 추적·줌 유지용 (.compass)
         mapView.positionMode = .compass
+        
+        let initialLocation = NMGLatLng(lat: 37.4890303, lng: 126.8101745)
+        let cameraUpdate = NMFCameraUpdate(scrollTo: initialLocation, zoomTo: 15)
+        mapView.moveCamera(cameraUpdate)// 지도도 회전
     }
     
-    // MARK: - 권한 체크
+    // ───────── 권한 체크 ─────────
     func checkIfLocationServiceIsEnabled() {
         if CLLocationManager.locationServicesEnabled() {
             locationManager.requestWhenInUseAuthorization()
@@ -54,7 +61,7 @@ class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
-    // MARK: - CLLocationManagerDelegate
+    // ───────── CLLocationManagerDelegate ─────────
     func locationManager(_ manager: CLLocationManager,
                          didUpdateLocations locations: [CLLocation]) {
         guard let latest = locations.last else { return }
@@ -66,24 +73,21 @@ class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
         let heading = newHeading.trueHeading
         guard heading >= 0 else { return }
         
-        // 1) 카메라 bearing을 헤딩에 맞춰 회전
+        // 지도 회전
         let params = NMFCameraUpdateParams()
         params.rotate(to: heading)
         mapView.moveCamera(NMFCameraUpdate(params: params))
+        mapView.locationOverlay.heading = heading     // 핀 화살표 고정
         
-        // 2) 화살표는 화면 위쪽 고정
-        mapView.locationOverlay.heading = 0
-        
-        // 3) 디버그 로그
         print("▶︎ Heading & camera bearing: \(heading)°")
     }
     
     func locationManager(_ manager: CLLocationManager,
                          didFailWithError error: Error) {
-        print("❌ 위치 업데이트 실패: \(error.localizedDescription)")
+        print("❌ 위치 업데이트 실패:", error.localizedDescription)
     }
     
-    // MARK: - 지도 제어
+    // ───────── 지도 제어 ─────────
     func updateMapWithLocation() {
         guard let loc = userLocation else {
             print("❗ 사용자 위치 없음")
@@ -95,15 +99,23 @@ class Coordinator: NSObject, ObservableObject, CLLocationManagerDelegate {
         mapView.locationOverlay.location = latLng
     }
     
-    // 마커 생성
+    // ───────── 마커 생성 (말풍선 이미지 사용) ─────────
     func setMarker(lat: Double, lng: Double, name: String) {
         let marker = NMFMarker()
         marker.position = NMGLatLng(lat: lat, lng: lng)
-        marker.captionText = name
+        marker.anchor   = CGPoint(x: 0.5, y: 1)          // 말풍선 하단이 좌표에 닿도록
+        
+        // FireStoreManager의 함수로 말풍선 이미지 생성
+        if let img = FireStoreManager().makeTextMarkerImage(storeName: name) {
+            marker.iconImage = NMFOverlayImage(image: img)
+            marker.width  = CGFloat(NMF_MARKER_SIZE_AUTO)
+            marker.height = CGFloat(NMF_MARKER_SIZE_AUTO)
+        }
+        
         marker.mapView = mapView
     }
     
-    // NMFMapView 반환
+    // NMFMapView 제공
     func getNaverMapView() -> NMFMapView {
         return mapView
     }
